@@ -147,18 +147,32 @@
   }
 
   /* =========================================================
-     6. PRELOAD — carregar todos os vídeos
+     6. PRELOAD — carrega o primeiro vídeo com prioridade,
+        demais carregam em segundo plano sem bloquear o loader
   ========================================================= */
-  function loadVideos(onComplete) {
-    const total = VIDEO_SRCS.length;
-    let done    = 0;
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 
-    function onReady() {
+  function loadVideos(onComplete) {
+    const total    = VIDEO_SRCS.length;
+    let done       = 0;
+    let revealed   = false;
+
+    function onReady(i) {
       done++;
       const pct = Math.round((done / total) * 100);
       if (loaderBar) loaderBar.style.width = pct + '%';
       if (loaderPct) loaderPct.textContent  = pct + '%';
-      if (done >= total) onComplete();
+
+      // Abre o site assim que o 1º vídeo estiver pronto
+      if (!revealed && videoEls[0] && i === 0) {
+        revealed = true;
+        onComplete();
+      }
+      // Fallback: se o 1º vídeo demorar mais que os outros, libera assim que qualquer 2 estiverem prontos
+      if (!revealed && done >= 2) {
+        revealed = true;
+        onComplete();
+      }
     }
 
     VIDEO_SRCS.forEach((src, i) => {
@@ -167,15 +181,19 @@
       v.muted       = true;
       v.loop        = true;
       v.playsInline = true;
-      v.preload     = 'auto';
+      // Mobile: preload só do 1º; desktop: preload de todos
+      v.preload     = (i === 0) ? 'auto' : (isMobile ? 'metadata' : 'auto');
 
       let fired = false;
+      // Timeout menor no mobile — não espera o buffering completo
+      const wait = isMobile ? 1500 : 4000;
       const timeout = setTimeout(() => {
-        if (!fired) { fired = true; onReady(); }
-      }, 5000);
+        if (!fired) { fired = true; onReady(i); }
+      }, wait);
 
-      v.addEventListener('canplaythrough', () => {
-        if (!fired) { fired = true; clearTimeout(timeout); onReady(); }
+      // canplay (não canplaythrough) — dispara assim que há dados suficientes para começar
+      v.addEventListener('canplay', () => {
+        if (!fired) { fired = true; clearTimeout(timeout); onReady(i); }
       }, { once: true });
 
       videoEls[i] = v;
