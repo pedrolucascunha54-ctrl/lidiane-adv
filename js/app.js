@@ -1,7 +1,7 @@
 /* ============================================================
-   Lidiane Flores e Arvelos Advocacia — Scroll-Driven Engine
-   Canvas: vídeos Google Flow em loop · cross-fade por seção
-   Stack: Lenis + GSAP + ScrollTrigger + Canvas Video
+   Lidiane Flores — Advogada Trabalhista
+   Canvas: vídeos scrubbing real — avança com o scroll
+   Stack: Lenis + GSAP + ScrollTrigger + Canvas Video Scrub
 ============================================================ */
 (function () {
   'use strict';
@@ -90,7 +90,7 @@
 
   /* =========================================================
      3. CANVAS — rAF loop contínuo
-     Desenha o vídeo atual (e cross-fade com o anterior)
+     Desenha frame atual dos vídeos (scrubbing — sem autoplay)
   ========================================================= */
   function drawLoop(timestamp) {
     requestAnimationFrame(drawLoop);
@@ -102,11 +102,7 @@
     let blend = 1;
     if (blendStart !== null) {
       blend = Math.min(1, (timestamp - blendStart) / BLEND_MS);
-      if (blend >= 1) {
-        blendStart = null;
-        if (pv && pv !== cv) { pv.pause(); pv.currentTime = 0; }
-        prevIdx = -1;
-      }
+      if (blend >= 1) { blendStart = null; prevIdx = -1; }
     }
 
     /* Vídeo anterior embaixo */
@@ -115,7 +111,7 @@
       drawPaddedCover(pv);
     }
 
-    /* Vídeo atual por cima com alpha de blend */
+    /* Vídeo atual por cima */
     if (cv) {
       ctx.globalAlpha = blend;
       drawPaddedCover(cv);
@@ -134,16 +130,43 @@
   }
 
   /* =========================================================
-     5. Trocar vídeo ativo (com cross-fade suave)
+     5. SCRUBBING — avança o vídeo conforme o scroll
+     O vídeo NÃO toca sozinho: o currentTime é controlado
+     pelo progresso do scroll dentro do range de cada seção
   ========================================================= */
-  function setActiveVideo(idx) {
-    if (idx === currentIdx) return;
-    prevIdx    = currentIdx;
-    currentIdx = idx;
-    blendStart = performance.now();
+  function scrubCanvas(p) {
+    const idx = getVideoIdx(p);
 
-    const nv = videoEls[idx];
-    if (nv) { nv.currentTime = 0; nv.play().catch(() => {}); }
+    /* Troca de vídeo com cross-fade */
+    if (idx !== currentIdx) {
+      prevIdx    = currentIdx;
+      currentIdx = idx;
+      blendStart = performance.now();
+    }
+
+    /* Calcula posição local dentro do range deste vídeo */
+    const lo  = BREAKS[idx];
+    const hi  = (idx + 1 < BREAKS.length) ? BREAKS[idx + 1] : 1;
+    const t   = Math.max(0, Math.min(1, (p - lo) / (hi - lo)));
+
+    const v = videoEls[idx];
+    if (v && v.readyState >= 2 && v.duration) {
+      const target = t * v.duration;
+      /* Só busca se a diferença for maior que 1 frame */
+      if (Math.abs(v.currentTime - target) > 0.033) {
+        v.currentTime = target;
+      }
+    }
+
+    /* Mantém o frame do vídeo anterior congelado durante cross-fade */
+    const pv = prevIdx >= 0 ? videoEls[prevIdx] : null;
+    if (pv && pv !== v && pv.readyState >= 2) {
+      // Congela no último frame do range anterior
+      const pHi = BREAKS[prevIdx + 1] || 1;
+      const pLo = BREAKS[prevIdx];
+      const pT  = Math.max(0, Math.min(1, (p - pLo) / (pHi - pLo)));
+      if (pv.duration) pv.currentTime = Math.min(pT * pv.duration, pv.duration - 0.05);
+    }
   }
 
   /* =========================================================
@@ -179,9 +202,8 @@
       const v = document.createElement('video');
       v.src         = src;
       v.muted       = true;
-      v.loop        = true;
+      v.loop        = false;   // scrubbing — não toca automaticamente
       v.playsInline = true;
-      // Mobile: preload só do 1º; desktop: preload de todos
       v.preload     = (i === 0) ? 'auto' : (isMobile ? 'metadata' : 'auto');
 
       let fired = false;
@@ -391,7 +413,7 @@
       onUpdate(self) {
         const p = self.progress;
 
-        setActiveVideo(getVideoIdx(p));
+        scrubCanvas(p);
         updateSections(p);
         updateOverlay(p);
         updateMarquee(p);
@@ -504,8 +526,8 @@
       if (loaderBar) loaderBar.style.width = '100%';
       if (loaderPct) loaderPct.textContent  = '100%';
 
-      /* Inicia primeiro vídeo e loop de renderização */
-      if (videoEls[0]) videoEls[0].play().catch(() => {});
+      /* Posiciona primeiro vídeo no frame inicial e inicia loop de renderização */
+      if (videoEls[0]) videoEls[0].currentTime = 0;
       requestAnimationFrame(drawLoop);
 
       setTimeout(() => {
