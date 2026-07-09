@@ -1,7 +1,7 @@
 /* ============================================================
    Lidiane Flores — Advogada Trabalhista
-   Canvas: vídeos scrubbing real — avança com o scroll
-   Stack: Lenis + GSAP + ScrollTrigger + Canvas Video Scrub
+   Canvas: vídeos em autoplay loop — cross-fade por seção de scroll
+   Stack: Lenis + GSAP + ScrollTrigger + Canvas
 ============================================================ */
 (function () {
   'use strict';
@@ -90,7 +90,7 @@
 
   /* =========================================================
      3. CANVAS — rAF loop contínuo
-     Desenha frame atual dos vídeos (scrubbing — sem autoplay)
+     Desenha o vídeo atual (e cross-fade com o anterior)
   ========================================================= */
   function drawLoop(timestamp) {
     requestAnimationFrame(drawLoop);
@@ -102,7 +102,11 @@
     let blend = 1;
     if (blendStart !== null) {
       blend = Math.min(1, (timestamp - blendStart) / BLEND_MS);
-      if (blend >= 1) { blendStart = null; prevIdx = -1; }
+      if (blend >= 1) {
+        blendStart = null;
+        if (pv && pv !== cv) { pv.pause(); pv.currentTime = 0; }
+        prevIdx = -1;
+      }
     }
 
     /* Vídeo anterior embaixo */
@@ -111,7 +115,7 @@
       drawPaddedCover(pv);
     }
 
-    /* Vídeo atual por cima */
+    /* Vídeo atual por cima com alpha de blend */
     if (cv) {
       ctx.globalAlpha = blend;
       drawPaddedCover(cv);
@@ -130,43 +134,16 @@
   }
 
   /* =========================================================
-     5. SCRUBBING — avança o vídeo conforme o scroll
-     O vídeo NÃO toca sozinho: o currentTime é controlado
-     pelo progresso do scroll dentro do range de cada seção
+     5. Trocar vídeo ativo (com cross-fade suave)
   ========================================================= */
-  function scrubCanvas(p) {
-    const idx = getVideoIdx(p);
+  function setActiveVideo(idx) {
+    if (idx === currentIdx) return;
+    prevIdx    = currentIdx;
+    currentIdx = idx;
+    blendStart = performance.now();
 
-    /* Troca de vídeo com cross-fade */
-    if (idx !== currentIdx) {
-      prevIdx    = currentIdx;
-      currentIdx = idx;
-      blendStart = performance.now();
-    }
-
-    /* Calcula posição local dentro do range deste vídeo */
-    const lo  = BREAKS[idx];
-    const hi  = (idx + 1 < BREAKS.length) ? BREAKS[idx + 1] : 1;
-    const t   = Math.max(0, Math.min(1, (p - lo) / (hi - lo)));
-
-    const v = videoEls[idx];
-    if (v && v.readyState >= 2 && v.duration) {
-      const target = t * v.duration;
-      /* Só busca se a diferença for maior que 1 frame */
-      if (Math.abs(v.currentTime - target) > 0.033) {
-        v.currentTime = target;
-      }
-    }
-
-    /* Mantém o frame do vídeo anterior congelado durante cross-fade */
-    const pv = prevIdx >= 0 ? videoEls[prevIdx] : null;
-    if (pv && pv !== v && pv.readyState >= 2) {
-      // Congela no último frame do range anterior
-      const pHi = BREAKS[prevIdx + 1] || 1;
-      const pLo = BREAKS[prevIdx];
-      const pT  = Math.max(0, Math.min(1, (p - pLo) / (pHi - pLo)));
-      if (pv.duration) pv.currentTime = Math.min(pT * pv.duration, pv.duration - 0.05);
-    }
+    const nv = videoEls[idx];
+    if (nv) { nv.currentTime = 0; nv.play().catch(() => {}); }
   }
 
   /* =========================================================
@@ -202,7 +179,7 @@
       const v = document.createElement('video');
       v.src         = src;
       v.muted       = true;
-      v.loop        = false;   // scrubbing — não toca automaticamente
+      v.loop        = true;
       v.playsInline = true;
       v.preload     = (i === 0) ? 'auto' : (isMobile ? 'metadata' : 'auto');
 
@@ -413,7 +390,7 @@
       onUpdate(self) {
         const p = self.progress;
 
-        scrubCanvas(p);
+        setActiveVideo(getVideoIdx(p));
         updateSections(p);
         updateOverlay(p);
         updateMarquee(p);
@@ -527,7 +504,7 @@
       if (loaderPct) loaderPct.textContent  = '100%';
 
       /* Posiciona primeiro vídeo no frame inicial e inicia loop de renderização */
-      if (videoEls[0]) videoEls[0].currentTime = 0;
+      if (videoEls[0]) { videoEls[0].currentTime = 0; videoEls[0].play().catch(() => {}); }
       requestAnimationFrame(drawLoop);
 
       setTimeout(() => {
