@@ -1,0 +1,13 @@
+# robots.txt — Lidiane Flores, Advogada Trabalhista
+# https://lidiane-adv.vercel.app/
+
+User-agent: *
+Allow: /
+
+# Recursos necessários para renderização — não bloquear
+Allow: /css/
+Allow: /js/
+Allow: /img/
+Allow: /videos/
+
+Sitemap: https://lidiane-adv.vercel.app/sitemap.xml
