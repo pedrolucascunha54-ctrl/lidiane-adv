@@ -1,0 +1,10 @@
+{
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "lidiane-adv.vercel.app" }],
+      "destination": "https://www.lidianefloresadv.com.br/:path*",
+      "permanent": true
+    }
+  ]
+}

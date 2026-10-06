@@ -2,7 +2,7 @@
 
 > Advocacia trabalhista com atendimento técnico, humano e estratégico em Lavras e nos 14 municípios da jurisdição da Vara do Trabalho de Lavras, MG.
 
-Site: https://lidiane-adv.vercel.app/
+Site: https://www.lidianefloresadv.com.br/
 Idioma: pt-BR
 
 ## Sobre
@@ -32,7 +32,7 @@ O escritório atua com foco em Direito do Trabalho, oferecendo atendimento técn
 
 ## Principais páginas
 
-- [Início](https://lidiane-adv.vercel.app/)
+- [Início](https://www.lidianefloresadv.com.br/)
 
 ## Observações
 
